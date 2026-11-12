@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Guitar interval visualiser</title>
+<style>
+  :root{
+    --ink:#2b2b28; --muted:#6b6a63; --board:#efe7d6; --wire:#c3b79c;
+    --nut:#3a352b; --string:#8a8578; --panel:#faf8f2; --line:#e3ddce;
+    --perfect:#1d9e75; --perfectInk:#0f6e56;
+    --major:#357fd0; --majorInk:#185fa5;
+    --minor:#d85a30; --minorInk:#993c1d;
+    --root:#2b2b28;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:#f3efe6;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);}
+  .wrap{max-width:780px;margin:0 auto;padding:20px 16px 44px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;}
+  .sub{font-size:14px;color:var(--muted);margin:0 0 16px;line-height:1.5;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 10px;}
+  .toggles{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 2px 12px;}
+  .tlabel{font-size:13px;color:var(--muted);margin-right:2px;}
+  .chipbtn{border:1.5px solid var(--wire);background:#fff;border-radius:22px;padding:7px 15px;font-size:14px;font-weight:600;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:7px;user-select:none;transition:all .12s;}
+  .chipbtn .swatch{width:12px;height:12px;border-radius:50%;background:currentColor;}
+  .chipbtn.on{color:#fff;}
+  .chipbtn.on.perfect{background:var(--perfect);border-color:var(--perfect);}
+  .chipbtn.on.major{background:var(--major);border-color:var(--major);}
+  .chipbtn.on.minor{background:var(--minor);border-color:var(--minor);}
+  .chipbtn.on .swatch{background:#fff;}
+  .rootline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:2px 2px 10px;}
+  .rootline .big{font-size:22px;font-weight:600;}
+  .rootline .hint{font-size:13px;color:var(--muted);}
+  svg{display:block;width:100%;height:auto;touch-action:manipulation;}
+  .cell{fill:transparent;cursor:pointer;}
+  .cell:active{fill:rgba(0,0,0,0.08);}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:14px 2px 4px;}
+  @media(max-width:600px){.legend{grid-template-columns:1fr;}}
+  .row{display:flex;align-items:center;gap:11px;padding:9px 8px;border-radius:8px;cursor:pointer;transition:background .12s;}
+  .row:hover{background:#f0ecdf;}
+  .row.active{background:#eae5d6;}
+  .chip{width:28px;height:28px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;}
+  .chip.hollow{background:#fff !important;border:2px dashed;}
+  .rowtext{font-size:13.5px;line-height:1.35;}
+  .rowtext b{font-weight:600;}
+  .rowtext .note{color:var(--muted);}
+  .rowtext .shape{display:block;font-size:12px;color:var(--muted);}
+  .rowtext .hidden-tag{font-size:11px;color:var(--minorInk);font-weight:600;}
+  .foot{font-size:12.5px;color:var(--muted);margin:14px 2px 0;line-height:1.55;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Fretboard interval visualiser</h1>
+  <p class="sub">One example of every interval, measured from the root. Tap any note to move the root. Toggle a group to hide its dots — the written explanations stay below, so students can work out where the notes are. Tap a name in the list to reveal or check its position on the board.</p>
+  <div class="panel">
+    <div class="toggles" id="toggles">
+      <span class="tlabel">Show on board:</span>
+      <button class="chipbtn on perfect" data-grp="perfect"><span class="swatch"></span>Perfect</button>
+      <button class="chipbtn on major" data-grp="major"><span class="swatch"></span>Major</button>
+      <button class="chipbtn on minor" data-grp="minor"><span class="swatch"></span>Minor</button>
+    </div>
+    <div class="rootline">
+      <span class="big" id="rootLabel">Root: A</span>
+      <span class="hint" id="rootHint"></span>
+    </div>
+    <svg id="board" viewBox="0 0 628 258" role="img" aria-label="Guitar fretboard showing intervals from the root note"></svg>
+    <div class="legend" id="legend"></div>
+    <p class="foot">
+      The root and the perfect intervals (4th, 5th, octave) are the fixed framework. Major intervals (2nd, 3rd, 6th, 7th) are the bright tones of a major key; minor intervals (♭3rd, ♭6th, ♭7th) are their flattened counterparts, in key for a minor key. Hide a group and the descriptions below still tell you where each note sits — a good way to test recall.
+    </p>
+  </div>
+</div>
+<script>
+(function(){
+  var openMidi=[64,59,55,50,45,40];
+  var openName=['E','B','G','D','A','E'];
+  var names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  var noteName=function(m){return names[((m%12)+12)%12];};
+  var pitch=function(r,f){return openMidi[r]+f;};
+
+  var intervals=[
+    {semi:0, deg:'R', name:'Root (unison)', grp:'root'},
+    {semi:2, deg:'2', name:'Major 2nd',    grp:'major'},
+    {semi:3, deg:'♭3',name:'Minor 3rd',    grp:'minor'},
+    {semi:4, deg:'3', name:'Major 3rd',    grp:'major'},
+    {semi:5, deg:'4', name:'Perfect 4th',  grp:'perfect'},
+    {semi:7, deg:'5', name:'Perfect 5th',  grp:'perfect'},
+    {semi:8, deg:'♭6',name:'Minor 6th',    grp:'minor'},
+    {semi:9, deg:'6', name:'Major 6th',    grp:'major'},
+    {semi:10,deg:'♭7',name:'Minor 7th',    grp:'minor'},
+    {semi:11,deg:'7', name:'Major 7th',    grp:'major'},
+    {semi:12,deg:'8', name:'Octave',       grp:'perfect'}
+  ];
+  var grpColor={root:'#2b2b28',perfect:'#1d9e75',major:'#357fd0',minor:'#d85a30'};
+  var groups={perfect:true,major:true,minor:true};
+  var activeDeg=null;
+
+  function best(rR,rF,semi){
+    var target=pitch(rR,rF)+semi,c=[];
+    for(var r=0;r<6;r++)for(var f=0;f<=16;f++){
+      if(pitch(r,f)===target){var dR=r-rR,dF=f-rF;c.push({r:r,f:f,dRow:dR,dFret:dF,score:Math.abs(dR)+Math.abs(dF)});}
+    }
+    c.sort(function(a,b){return a.score-b.score||Math.abs(a.dRow)-Math.abs(b.dRow)||(a.dRow-b.dRow)||Math.abs(a.dFret)-Math.abs(b.dFret);});
+    return c[0];
+  }
+  function shapeText(rR,rF,p){
+    if(p.dRow===0&&p.dFret===0)return 'start here';
+    var up=rR-p.r,df=p.f-rF,parts=[];
+    if(up>0)parts.push(up+' string'+(up>1?'s':'')+' up');
+    else if(up<0)parts.push((-up)+' string'+(-up>1?'s':'')+' down');
+    else parts.push('same string');
+    parts.push((df>=0?'+':'')+df+' fret'+(Math.abs(df)===1?'':'s'));
+    return parts.join(', ');
+  }
+
+  var mL=40,cellW=44,mT=18,sGap=34,nFret=12;
+  var xC=function(f){return mL+f*cellW+cellW/2;};
+  var yC=function(r){return mT+r*sGap+sGap/2;};
+  var boardR=mL+(nFret+1)*cellW;
+
+  var svg=document.getElementById('board');
+  var legend=document.getElementById('legend');
+  var rootLabel=document.getElementById('rootLabel');
+  var rootHint=document.getElementById('rootHint');
+  var root={r:5,f:5};
+  var positions={};
+
+  function el(tag,a,txt){var e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(var k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+
+  function render(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    svg.appendChild(el('rect',{x:mL,y:mT,width:(nFret+1)*cellW,height:6*sGap,rx:4,fill:'var(--board)'}));
+    for(var f=0;f<=nFret+1;f++){var x=mL+f*cellW,isNut=(f===1);svg.appendChild(el('line',{x1:x,y1:mT,x2:x,y2:mT+6*sGap,stroke:isNut?'var(--nut)':'var(--wire)','stroke-width':isNut?4:1.5}));}
+    for(var r=0;r<6;r++){svg.appendChild(el('line',{x1:mL,y1:yC(r),x2:boardR,y2:yC(r),stroke:'var(--string)','stroke-width':0.6+r*0.35}));svg.appendChild(el('text',{x:mL-8,y:yC(r)+4,'text-anchor':'end','font-size':12,'font-weight':600,fill:'var(--muted)'},openName[r]));}
+    [3,5,7,9].forEach(function(f){svg.appendChild(el('circle',{cx:xC(f),cy:mT+3*sGap,r:4,fill:'var(--wire)'}));});
+    svg.appendChild(el('circle',{cx:xC(12),cy:mT+2*sGap-2,r:4,fill:'var(--wire)'}));
+    svg.appendChild(el('circle',{cx:xC(12),cy:mT+4*sGap+2,r:4,fill:'var(--wire)'}));
+    for(var fn=0;fn<=nFret;fn++)svg.appendChild(el('text',{x:xC(fn),y:mT+6*sGap+18,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},fn===0?'open':String(fn)));
+
+    for(var rr=0;rr<6;rr++)for(var ff=0;ff<=nFret;ff++){
+      (function(rr,ff){var c=el('circle',{cx:xC(ff),cy:yC(rr),r:15});c.setAttribute('class','cell');c.addEventListener('click',function(){root={r:rr,f:ff};activeDeg=null;render();});svg.appendChild(c);})(rr,ff);
+    }
+
+    var overlay=el('g',{id:'overlay'});svg.appendChild(overlay);
+
+    positions={};
+    intervals.forEach(function(iv){
+      var p=best(root.r,root.f,iv.semi);positions[iv.deg]=p;
+      var visible=(iv.grp==='root')||groups[iv.grp];
+      if(!visible)return;
+      var color=grpColor[iv.grp];
+      var g=el('g',{});
+      g.appendChild(el('circle',{cx:xC(p.f),cy:yC(p.r),r:iv.grp==='root'?15:14,fill:color,stroke:'#fff','stroke-width':2}));
+      g.appendChild(el('text',{x:xC(p.f),y:yC(p.r)+4.5,'text-anchor':'middle','font-size':13,'font-weight':700,fill:'#fff'},iv.deg));
+      svg.appendChild(g);
+    });
+
+    rootLabel.textContent='Root: '+noteName(pitch(root.r,root.f));
+    rootHint.textContent='('+openName[root.r]+' string, '+(root.f===0?'open':'fret '+root.f)+')  •  tap a note to move it';
+
+    while(legend.firstChild)legend.removeChild(legend.firstChild);
+    intervals.forEach(function(iv){
+      var p=positions[iv.deg];
+      var visible=(iv.grp==='root')||groups[iv.grp];
+      var row=document.createElement('div');row.className='row'+(activeDeg===iv.deg?' active':'');
+      var chip=document.createElement('div');chip.className='chip'+(visible?'':' hollow');
+      if(visible){chip.style.background=grpColor[iv.grp];chip.style.color='#fff';}
+      else{chip.style.color=grpColor[iv.grp];chip.style.borderColor=grpColor[iv.grp];}
+      chip.textContent=iv.deg;
+      var t=document.createElement('div');t.className='rowtext';
+      t.innerHTML='<b>'+iv.name+'</b> <span class="note">– '+noteName(pitch(p.r,p.f))+'</span>'+
+                  (visible?'':' <span class="hidden-tag">hidden</span>')+
+                  '<span class="shape">'+shapeText(root.r,root.f,p)+'</span>';
+      row.appendChild(chip);row.appendChild(t);
+      row.addEventListener('click',function(){activeDeg=(activeDeg===iv.deg?null:iv.deg);render();});
+      legend.appendChild(row);
+    });
+
+    if(activeDeg&&positions[activeDeg]){
+      var iv2=intervals.filter(function(x){return x.deg===activeDeg;})[0];
+      if(iv2&&iv2.grp!=='root')drawConnector(positions[activeDeg],iv2);
+    }
+  }
+
+  function drawConnector(p,iv){
+    var o=document.getElementById('overlay');if(!o)return;
+    while(o.firstChild)o.removeChild(o.firstChild);
+    o.appendChild(el('line',{x1:xC(root.f),y1:yC(root.r),x2:xC(p.f),y2:yC(p.r),stroke:grpColor[iv.grp],'stroke-width':2.5,'stroke-dasharray':'5 4','stroke-linecap':'round'}));
+    o.appendChild(el('circle',{cx:xC(p.f),cy:yC(p.r),r:19,fill:'none',stroke:grpColor[iv.grp],'stroke-width':2.5}));
+    o.appendChild(el('circle',{cx:xC(p.f),cy:yC(p.r),r:13,fill:grpColor[iv.grp]}));
+    o.appendChild(el('text',{x:xC(p.f),y:yC(p.r)+4.5,'text-anchor':'middle','font-size':13,'font-weight':700,fill:'#fff'},iv.deg));
+  }
+
+  document.getElementById('toggles').addEventListener('click',function(e){
+    var b=e.target.closest('.chipbtn');if(!b)return;
+    var g=b.getAttribute('data-grp');groups[g]=!groups[g];
+    b.classList.toggle('on',groups[g]);
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
