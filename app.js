@@ -195,7 +195,7 @@ svg.addEventListener('pointermove', e => {
   }
   if (!down.dragging) return;
   const unitsPerPx = view.w / svg.getBoundingClientRect().width;
-  const want = down.c0 - dx * unitsPerPx;               // neck follows the finger
+  const want = down.c0 + dx * unitsPerPx;               // highlight follows the finger (PLAN 5.3)
   let best = 0;
   list.forEach((_, i) => { if (Math.abs(centre(i) - want) < Math.abs(centre(best) - want)) best = i; });
   if (best !== index) go(best, true);
