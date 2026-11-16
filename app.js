@@ -1,16 +1,16 @@
 import * as T from './theory.js';
 
-const SCALE_ROWS = [['major','Major'],['minor','Minor'],['majpent','Maj pent'],['minpent','Min pent']];
+const SCALE_ROWS = [['major','Major'],['minor','Minor'],['majpent','Maj pent'],['minpent','Min pent'],['modes','Modes ▾']];
 const LABEL_OPTS = [['degrees','Degrees'],['notes','Notes'],['none','Nothing']];
 const NECK_OPTS = [['only','Shape only'],['faded','Faded'],['whole','Whole neck']];
 const STORE = 'fretboard-visualiser-v2';
 
 // ---- state ----------------------------------------------------------------
-const state = { tonicPc: 2, scale: 'major', shape: 'E', labels: 'degrees', neck: 'faded' };
+const state = { tonicPc: 2, scale: 'major', shape: 'E', labels: 'degrees', neck: 'faded', modeView: 'notes' };
 let list = [], index = 0;
 try {
   const s = JSON.parse(localStorage.getItem(STORE) || 'null');
-  if (s && T.SCALES[s.scale] && ['major','minor','majpent','minpent'].includes(s.scale)) Object.assign(state, s);
+  if (s && T.SCALES[s.scale] && ['notes','root'].includes(s.modeView || 'notes')) Object.assign(state, s);
 } catch {}
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {} };
 
@@ -51,13 +51,68 @@ makeSwitch('labels', LABEL_OPTS, 'labels');
 makeSwitch('neck', NECK_OPTS, 'neck');
 
 const scalesEl = document.getElementById('scales');
+
+// Move to a new scale/tonic. how: 'same' keeps the current shape copy (same dots),
+// 'nearest' keeps the copy whose lowest fret is closest, 'first' starts at the default shape.
+function setScale(scale, tonicPc, how) {
+  const minFret = list[index].minFret;
+  state.scale = scale; state.tonicPc = tonicPc;
+  const oldIndex = index;
+  list = T.scaleInstances(state.tonicPc, state.scale);
+  if (how === 'same') index = Math.min(oldIndex, list.length - 1);
+  else if (how === 'nearest') index = T.nearestInstance(list, minFret);
+  else { state.shape = T.firstShape(scale); index = T.pickInstance(list, state.shape); }
+  state.shape = list[index].shape;
+  render(true);
+}
+function pickMode(i) {
+  if (state.modeView === 'notes') {
+    const t = T.sameNotesTarget(state.tonicPc, state.scale, i);
+    setScale(t.scale, t.tonicPc, 'same');
+  } else {
+    const t = T.sameRootTarget(state.tonicPc, i);
+    setScale(t.scale, t.tonicPc, 'nearest');
+  }
+}
 SCALE_ROWS.forEach(([v, label]) => {
   const b = document.createElement('button');
   b.className = 'pill'; b.textContent = label; b.dataset.v = v;
   b.addEventListener('click', () => {
-    state.scale = v; state.shape = T.firstShape(v); rebuildList(); render(true);
+    const inMode = T.isDiatonic(state.scale) && !['major', 'minor'].includes(state.scale);
+    if (v === 'modes') {
+      if (!T.isDiatonic(state.scale)) setScale(state.scale === 'minpent' ? 'minor' : 'major', state.tonicPc, 'first');
+      else if (!inMode) pickMode(1);                      // show Dorian to start with
+    } else if ((v === 'major' || v === 'minor') && inMode) {
+      pickMode(v === 'major' ? 0 : 5);                    // same as tapping Ionian / Aeolian
+    } else setScale(v, state.tonicPc, 'first');
   });
   scalesEl.appendChild(b);
+});
+
+// ---- mode strip (7-note scales only) ---------------------------------------
+const modesEl = document.getElementById('modes');
+function renderModes() {
+  modesEl.hidden = !T.isDiatonic(state.scale);
+  if (modesEl.hidden) return;
+  const chips = document.getElementById('modeChips');
+  chips.innerHTML = '';
+  const cur = T.modeIndex(state.scale);
+  for (let i = 0; i < 7; i++) {
+    const t = state.modeView === 'notes' ? T.sameNotesTarget(state.tonicPc, state.scale, i)
+                                         : T.sameRootTarget(state.tonicPc, i);
+    const b = document.createElement('button');
+    b.className = 'chip' + (i === cur ? ' on' : '');
+    b.textContent = `${T.tonicName(t.tonicPc, t.scale)} ${T.MODE_NAMES[i]}`;
+    b.addEventListener('click', () => pickMode(i));
+    chips.appendChild(b);
+  }
+  document.querySelectorAll('#viewSwitch .pill').forEach(b => b.classList.toggle('on', b.dataset.v === state.modeView));
+}
+[['notes', 'Same notes'], ['root', 'Same root']].forEach(([v, label]) => {
+  const b = document.createElement('button');
+  b.className = 'pill'; b.textContent = label; b.dataset.v = v;
+  b.addEventListener('click', () => { state.modeView = v; render(true); });
+  document.getElementById('viewSwitch').appendChild(b);
 });
 
 // ---- fretboard geometry ---------------------------------------------------
@@ -92,6 +147,7 @@ function buildBoard() {
 function buildDots() {
   svg.querySelectorAll('.dot').forEach(d => d.remove());
   dotEls = new Map();
+  const accentPcs = state.modeView === 'root' ? T.differingPcs(state.tonicPc, state.scale) : [];
   for (const n of T.neckNotes(state.tonicPc, state.scale)) {
     const g = el('g', { class: 'dot' }, svg);
     g.dataset.s = n.string; g.dataset.f = n.fret;
@@ -99,6 +155,7 @@ function buildDots() {
     const t = el('text', { x: xFret(n.fret), y: yStr(n.string) + 1 }, g);
     t.textContent = state.labels === 'degrees' ? n.degree : state.labels === 'notes' ? n.name : '';
     if (n.isRoot) g.classList.add('root');
+    else if (accentPcs.includes(n.pc)) g.classList.add('accent');
     dotEls.set(n.string + ':' + n.fret, g);
   }
   paintDots();
@@ -145,9 +202,17 @@ function renderChrome() {
   const inst = list[index];
   const tn = T.tonicName(state.tonicPc, state.scale);
   const sc = T.SCALES[state.scale].label.toLowerCase();
-  document.getElementById('title').textContent = `${tn} ${sc} · ${T.shapeName(inst.shape, state.scale, state.tonicPc)}`;
+  const plain = ['major', 'minor', 'majpent', 'minpent'].includes(state.scale);
+  const sn = T.shapeName(inst.shape, state.scale, state.tonicPc);
+  const name = plain || !T.isDiatonic(state.scale) ? `${tn} ${sc}` : `${tn} ${T.SCALES[state.scale].label}`;
+  document.getElementById('title').textContent = plain ? `${name} · ${sn}`
+    : state.modeView === 'notes' ? `${name} · same notes as ${sn}` : `${name} · ${sn}`;
+  const line = state.modeView === 'root' && T.MODE_LINES[state.scale] ? T.MODE_LINES[state.scale] : '';
+  const ml = document.getElementById('modeline'); ml.textContent = line; ml.hidden = !line;
+  renderModes();
   document.title = document.getElementById('title').textContent + ' – Fretboard Visualiser';
-  document.querySelectorAll('#scales .pill').forEach(b => b.classList.toggle('on', b.dataset.v === state.scale));
+  document.querySelectorAll('#scales .pill').forEach(b => b.classList.toggle('on',
+    b.dataset.v === 'modes' ? (T.isDiatonic(state.scale) && !['major', 'minor'].includes(state.scale)) : b.dataset.v === state.scale));
   document.querySelectorAll('#labels .pill').forEach(b => b.classList.toggle('on', b.dataset.v === state.labels));
   document.querySelectorAll('#neck .pill').forEach(b => b.classList.toggle('on', b.dataset.v === state.neck));
   const strip = document.getElementById('strip');

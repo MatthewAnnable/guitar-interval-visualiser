@@ -87,4 +87,44 @@ test('8. F# major note names', () => {
   assert.deepEqual([0,2,3,5,7].map(pc => T.degreeLabel(pc, 0, 'minpent')).slice(0,1), ['R']);
 });
 
-console.log(`\nAll ${n} tests passed`);
+
+// ---- modes ----
+test('9. parallel-mode parents for D', () => {
+  const want = { major: 2, dorian: 0, phrygian: 10, lydian: 9, mixolydian: 7, minor: 5, locrian: 3 };
+  for (const k in want) assert.equal(T.parentPcOf(2, k), want[k], k);
+});
+test('10. same-notes target keeps the parent; 7 chips cover all 7 modes', () => {
+  for (const [tonic, scale] of [[2, 'major'], [4, 'dorian'], [11, 'minor']]) {
+    const parent = T.parentPcOf(tonic, scale);
+    const names = [];
+    for (let i = 0; i < 7; i++) {
+      const t = T.sameNotesTarget(tonic, scale, i);
+      assert.equal(T.parentPcOf(t.tonicPc, t.scale), parent);
+      assert.equal(JSON.stringify(T.scaleInstances(t.tonicPc, t.scale)), JSON.stringify(T.scaleInstances(tonic, scale)));
+      names.push(T.tonicName(t.tonicPc, t.scale) + ' ' + T.MODE_NAMES[i]);
+    }
+    if (tonic === 2) assert.deepEqual(names, ['D Ionian','E Dorian','F# Phrygian','G Lydian','A Mixolydian','B Aeolian','C# Locrian']);
+  }
+});
+test('11. differing notes vs plain major / minor', () => {
+  const d = (scale) => T.differingPcs(2, scale).sort((a, b) => a - b);
+  assert.deepEqual(d('dorian'), [11]);          // B, the major 6th
+  assert.deepEqual(d('lydian'), [8]);           // G#, the sharp 4th
+  assert.deepEqual(d('mixolydian'), [0]);       // C natural
+  assert.deepEqual(d('phrygian'), [3]);         // Eb
+  assert.deepEqual(d('locrian'), [3, 8]);       // Eb, Ab
+  assert.deepEqual(d('major'), []);
+  assert.deepEqual(d('minor'), []);
+  assert.deepEqual(d('majpent'), []);
+});
+test('12. mode names spelled from the parent key; same-root parent moves the dots', () => {
+  const dm = [4,6,7,9,11,1,2].map(pc => T.noteName(pc, 4, 'dorian'));
+  assert.deepEqual(dm, ['E','F#','G','A','B','C#','D']);
+  assert.deepEqual(T.scaleInstances(2, 'dorian').map(i => i.shape + i.minFret),
+                   T.scaleInstances(0, 'major').map(i => i.shape + i.minFret));
+  const list = T.scaleInstances(2, 'major');
+  assert.equal(T.nearestInstance(list, 9), 3);
+  assert.equal(T.nearestInstance(list, 5), 1);
+});
+console.log(`
+All ${n} tests passed`);

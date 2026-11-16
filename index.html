@@ -8,13 +8,13 @@
   :root {
     --bg:#faf7f2; --ink:#1d1b19; --mute:#7a746b; --card:#fff; --line:#e4ddd0; --accent:#8a4b1f; --chip:#f1ebe1;
     --board:#efe7d6; --wire:#c3b79c; --string:#8a8578; --win:rgba(138,75,31,.10);
-    --dot:#8a4b1f; --dotink:#fff;
+    --dot:#8a4b1f; --dotink:#fff; --acc:#1f6fd0;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg:#181614; --ink:#f0ebe3; --mute:#9c958a; --card:#23201d; --line:#3a352f; --accent:#e0a064; --chip:#2e2a26;
       --board:#2f2a24; --wire:#5a5146; --string:#9c958a; --win:rgba(224,160,100,.14);
-      --dot:#e0a064; --dotink:#181614;
+      --dot:#e0a064; --dotink:#181614; --acc:#6fb3ff;
     }
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -40,16 +40,22 @@
   .fb .dot { transform-box:fill-box; transform-origin:center; transition:opacity .15s, transform .15s; cursor:pointer; }
   .fb .dot circle { fill:var(--dot); }
   .fb .dot text { fill:var(--dotink); font-size:15px; font-weight:700; text-anchor:middle; dominant-baseline:central; pointer-events:none; letter-spacing:-.3px; }
+  .fb .dot.accent circle { fill:var(--acc); }
   .fb .dot.root circle { fill:var(--ink); } .fb .dot.root text { fill:var(--bg); }
   .fb .dot.faded { opacity:.25; transform:scale(.62); }
   .fb .dot.full  { opacity:.9; transform:scale(.7); }
   .fb .dot.hidden { opacity:0; transform:scale(.4); pointer-events:none; }
+  #modes .chip { border:1.5px solid var(--line); background:var(--card); border-radius:10px; padding:4px 9px; font-size:14px; font-weight:600; }
+  #modes .chip.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  #modes .row { margin-bottom:6px; }
+  .modeline { text-align:center; font-weight:600; margin:6px 0 0; }
+  [hidden] { display:none !important; }
   .strip { display:flex; justify-content:center; align-items:center; gap:6px; margin:10px 0 14px; flex-wrap:wrap; }
   .strip .chip { border:1.5px solid var(--line); background:var(--card); border-radius:10px; min-width:40px; padding:5px 8px; font-weight:700; }
   .strip .chip.on { background:var(--dot); color:var(--dotink); border-color:var(--dot); }
   .strip .arrow { border:1.5px solid var(--line); background:var(--card); border-radius:20px; padding:5px 14px; font-weight:700; }
   .opts { display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:center; }
-  @media (max-width:600px) { h1 { font-size:18px; } .strip { gap:4px; } .strip .chip { min-width:34px; padding:5px 6px; } .strip .arrow { padding:5px 10px; } }
+  @media (max-width:600px) { .pill { padding:5px 10px; font-size:14px; } #modes .chip { padding:3px 7px; font-size:13px; } h1 { font-size:18px; } .strip { gap:4px; } .strip .chip { min-width:34px; padding:5px 6px; } .strip .arrow { padding:5px 10px; } }
   .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 </style>
 </head>
@@ -58,7 +64,12 @@
   <h1 id="title"></h1>
   <div class="row" id="keys" role="group" aria-label="Key"></div>
   <div class="row" id="scales" role="group" aria-label="Scale"></div>
+  <div id="modes" hidden>
+    <div class="row" id="modeChips"></div>
+    <div class="row" id="viewSwitch"></div>
+  </div>
   <svg class="fb" id="board" role="img" aria-label="Guitar fretboard. Drag sideways to move between shapes."></svg>
+  <div class="modeline" id="modeline" hidden></div>
   <div class="strip" id="strip"></div>
   <div class="opts">
     <div class="grp" id="labels"><span>Dots:</span></div>

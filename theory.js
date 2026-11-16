@@ -174,3 +174,50 @@ export function pickInstance(list, shape) {
   const good = copies.find(c => c.x.minFret >= 1) || copies[0];
   return good ? good.i : 0;
 }
+
+// ---- Modes (PLAN 5.4) -----------------------------------------------------
+export const MODE_NAMES = ['Ionian','Dorian','Phrygian','Lydian','Mixolydian','Aeolian','Locrian'];
+// Scale key for each mode index (0 = Ionian ... 6 = Locrian).
+export const MODE_KEYS = Object.keys(SCALES).filter(k => SCALES[k].family === 'diatonic')
+  .sort((a, b) => SCALES[a].mode - SCALES[b].mode);
+export const isDiatonic = scaleKey => SCALES[scaleKey].family === 'diatonic';
+export const modeIndex = scaleKey => SCALES[scaleKey].mode;
+
+// "Same notes": tapping mode i of the current parent key. Dots do not move.
+export function sameNotesTarget(tonicPc, scaleKey, i) {
+  const parent = parentPcOf(tonicPc, scaleKey);
+  return { tonicPc: mod12(parent + MAJOR_STEPS[i]), scale: MODE_KEYS[i] };
+}
+// "Same root": tapping mode i keeps the tonic; the notes change.
+export function sameRootTarget(tonicPc, i) {
+  return { tonicPc: mod12(tonicPc), scale: MODE_KEYS[i] };
+}
+
+// Which plain scale a mode is compared against in "same root" view.
+export function referenceScale(scaleKey) {
+  return { major: 'major', lydian: 'major', mixolydian: 'major',
+           minor: 'minor', dorian: 'minor', phrygian: 'minor', locrian: 'minor' }[scaleKey] || null;
+}
+// Pitch classes in this mode that are not in its reference scale on the same root.
+export function differingPcs(tonicPc, scaleKey) {
+  const ref = referenceScale(scaleKey);
+  if (!ref) return [];
+  const refPcs = scalePcs(tonicPc, ref);
+  return scalePcs(tonicPc, scaleKey).filter(p => !refPcs.includes(p));
+}
+export const MODE_LINES = {
+  dorian: 'Dorian = minor with a major 6th',
+  phrygian: 'Phrygian = minor with a flat 2nd',
+  lydian: 'Lydian = major with a sharp 4th',
+  mixolydian: 'Mixolydian = major with a flat 7th',
+  locrian: 'Locrian = minor with a flat 2nd and flat 5th',
+};
+
+// Index of the instance whose minFret is closest to the given fret (ties: lower).
+export function nearestInstance(list, minFret) {
+  let best = 0;
+  list.forEach((x, i) => {
+    if (Math.abs(x.minFret - minFret) < Math.abs(list[best].minFret - minFret)) best = i;
+  });
+  return best;
+}
