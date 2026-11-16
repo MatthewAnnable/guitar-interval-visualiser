@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as T from './theory.js';
+import { serializeHash, parseHash, encodeKey, decodeKey } from './hash.js';
 
 let n = 0;
 const test = (name, fn) => { fn(); n++; console.log('ok  ' + name); };
@@ -126,5 +127,31 @@ test('12. mode names spelled from the parent key; same-root parent moves the dot
   assert.equal(T.nearestInstance(list, 9), 3);
   assert.equal(T.nearestInstance(list, 5), 1);
 });
-console.log(`
-All ${n} tests passed`);
+// ---- hash ----
+test('13. hash round-trips every key, scale, view and copy', () => {
+  for (const scale of Object.keys(T.SCALES)) for (let pc = 0; pc < 12; pc++)
+    for (const modeView of ['notes', 'root']) {
+      const st = { tonicPc: pc, scale, modeView, labels: 'notes', neck: 'whole' };
+      for (const inst of T.scaleInstances(pc, scale)) {
+        const h = serializeHash(st, inst);
+        assert.ok(!h.slice(1).includes('#'), 'raw # in ' + h);
+        assert.deepEqual(parseHash(h), { tonicPc: pc, scale, modeView, shape: inst.shape, fret: inst.minFret, labels: 'notes', neck: 'whole' });
+      }
+    }
+});
+test('14. key encoding for sharps, flats and minor spellings', () => {
+  assert.equal(encodeKey('F#'), 'Fs'); assert.equal(encodeKey('B♭'), 'Bb');
+  assert.equal(decodeKey('Fs'), 6); assert.equal(decodeKey('F#'), 6); assert.equal(decodeKey('B♭'), 10);
+  assert.equal(decodeKey('Bb'), 10); assert.equal(decodeKey('Gs'), 8); assert.equal(decodeKey('b'), 11);
+  assert.deepEqual(parseHash('#key=F%23&scale=major'), { tonicPc: 6, scale: 'major' });
+  const h = serializeHash({ tonicPc: 8, scale: 'minor', modeView: 'notes', labels: 'degrees', neck: 'faded' }, { shape: 'G', minFret: 4 });
+  assert.ok(h.startsWith('#key=Gs&'), h);
+  assert.equal(parseHash(h).tonicPc, 8);
+});
+test('15. bad hash input is ignored field by field and never throws', () => {
+  for (const bad of ['', '#', '#garbage', '#%E0%A4%A', '#key=&scale=&&=&x', '#key=H&scale=lol&modes=x&shape=Z&fret=99&dots=q&neck=zzz', '#__proto__=1&scale=__proto__', '#scale=toString&scale2=constructor', null, undefined, 42])
+    assert.deepEqual(parseHash(bad), {}, String(bad));
+  assert.deepEqual(parseHash('#key=D&scale=lol&neck=faded'), { tonicPc: 2, neck: 'faded' });
+});
+
+console.log(`\nAll ${n} tests passed`);

@@ -1,4 +1,5 @@
 import * as T from './theory.js';
+import { serializeHash, parseHash } from './hash.js';
 
 const SCALE_ROWS = [['major','Major'],['minor','Minor'],['majpent','Maj pent'],['minpent','Min pent'],['modes','Modes ▾']];
 const LABEL_OPTS = [['degrees','Degrees'],['notes','Notes'],['none','Nothing']];
@@ -12,12 +13,20 @@ try {
   const s = JSON.parse(localStorage.getItem(STORE) || 'null');
   if (s && T.SCALES[s.scale] && ['notes','root'].includes(s.modeView || 'notes')) Object.assign(state, s);
 } catch {}
-const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {} };
+const save = () => {
+  state.fret = list[index].minFret;
+  try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {}
+  try { history.replaceState(null, '', serializeHash(state, list[index])); } catch {}
+};
 
-function rebuildList(keepShape = true) {
+function rebuildList(useFret = false) {
   list = T.scaleInstances(state.tonicPc, state.scale);
-  index = T.pickInstance(list, state.shape);
+  const exact = useFret ? list.findIndex(x => x.shape === state.shape && x.minFret === state.fret) : -1;
+  index = exact >= 0 ? exact : T.pickInstance(list, state.shape);
+  state.shape = list[index].shape;
 }
+// Links: the hash wins over localStorage; bad fields are ignored.
+function applyHash() { Object.assign(state, parseHash(location.hash)); }
 
 // ---- key picker (self-contained; onPick is the only way out) --------------
 function keyPicker(el, onPick) {
@@ -288,7 +297,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') { step(1); e.preventDefault(); }
 });
 window.addEventListener('resize', () => setView(false));
+window.addEventListener('hashchange', () => {
+  const h = parseHash(location.hash);
+  if (!Object.keys(h).length) return;
+  Object.assign(state, h); rebuildList(true); render(true);
+});
 
 // ---- go -------------------------------------------------------------------
-rebuildList();
+applyHash();
+rebuildList(true);
 render(true);
