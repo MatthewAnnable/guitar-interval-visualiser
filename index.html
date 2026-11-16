@@ -8,13 +8,13 @@
   :root {
     --bg:#faf7f2; --ink:#1d1b19; --mute:#7a746b; --card:#fff; --line:#e4ddd0; --accent:#8a4b1f; --chip:#f1ebe1;
     --board:#efe7d6; --wire:#c3b79c; --string:#8a8578; --win:rgba(138,75,31,.10);
-    --dot:#8a4b1f; --dotink:#fff; --acc:#1f6fd0;
+    --dot:#8a4b1f; --dotink:#fff; --acc:#1f6fd0; --pale:#ecdcc8; --paleline:#b98a62; --accpale:#d3e3f7;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg:#181614; --ink:#f0ebe3; --mute:#9c958a; --card:#23201d; --line:#3a352f; --accent:#e0a064; --chip:#2e2a26;
       --board:#2f2a24; --wire:#5a5146; --string:#9c958a; --win:rgba(224,160,100,.14);
-      --dot:#e0a064; --dotink:#181614; --acc:#6fb3ff;
+      --dot:#e0a064; --dotink:#181614; --acc:#6fb3ff; --pale:#45382b; --paleline:#a77a4e; --accpale:#243a52;
     }
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -39,10 +39,15 @@
   .fb .num { fill:var(--mute); font-size:15px; font-weight:600; text-anchor:middle; }
   .fb .dot { transform-box:fill-box; transform-origin:center; transition:opacity .15s, transform .15s; cursor:pointer; }
   .fb .dot circle { fill:var(--dot); }
-  .fb .dot text { fill:var(--dotink); font-size:15px; font-weight:700; text-anchor:middle; dominant-baseline:central; pointer-events:none; letter-spacing:-.3px; }
+  .fb .dot text { fill:var(--dotink); font-size:16px; font-weight:700; text-anchor:middle; dominant-baseline:central; pointer-events:none; letter-spacing:-.3px; }
   .fb .dot.accent circle { fill:var(--acc); }
   .fb .dot.root circle { fill:var(--ink); } .fb .dot.root text { fill:var(--bg); }
-  .fb .dot.faded { opacity:.25; transform:scale(.62); }
+  .fb .dot circle { transition:fill .15s, stroke .15s; }
+  .fb .dot.faded { transform:scale(.8); }
+  .fb .dot.faded circle { fill:var(--pale); stroke:var(--paleline); stroke-width:2.5; }
+  .fb .dot.faded text { fill:var(--ink); }
+  .fb .dot.faded.accent circle { fill:var(--accpale); stroke:var(--acc); }
+  .fb .dot.faded.root circle { fill:var(--pale); stroke:var(--ink); stroke-width:4.5; }
   .fb .dot.full  { opacity:.9; transform:scale(.7); }
   .fb .dot.hidden { opacity:0; transform:scale(.4); pointer-events:none; }
   #modes .chip { border:1.5px solid var(--line); background:var(--card); border-radius:10px; padding:4px 9px; font-size:14px; font-weight:600; }
