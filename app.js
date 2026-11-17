@@ -1,5 +1,7 @@
 import * as T from './theory.js';
 import { serializeHash, parseHash } from './hash.js';
+import * as P from './progression.js';
+import { createEngine } from './audio.js';
 
 const SCALE_ROWS = [['major','Major'],['minor','Minor'],['majpent','Maj pent'],['minpent','Min pent'],['modes','Modes ▾']];
 const LABEL_OPTS = [['degrees','Degrees'],['notes','Notes'],['none','Nothing']];
@@ -7,15 +9,17 @@ const NECK_OPTS = [['only','Shape only'],['faded','Faded'],['whole','Whole neck'
 const STORE = 'fretboard-visualiser-v2';
 
 // ---- state ----------------------------------------------------------------
-const state = { tonicPc: 2, scale: 'major', shape: 'E', labels: 'degrees', neck: 'faded', modeView: 'notes' };
+// state.jam is set only by a link from the Progression Builder ("play over chords").
+// It is never saved on this device, so the page opens as the plain visualiser next time.
+const state = { tonicPc: 2, scale: 'major', shape: 'E', labels: 'degrees', neck: 'faded', modeView: 'notes', jam: null };
 let list = [], index = 0;
 try {
   const s = JSON.parse(localStorage.getItem(STORE) || 'null');
-  if (s && T.SCALES[s.scale] && ['notes','root'].includes(s.modeView || 'notes')) Object.assign(state, s);
+  if (s && T.SCALES[s.scale] && ['notes','root'].includes(s.modeView || 'notes')) Object.assign(state, s, { jam: null });
 } catch {}
 const save = () => {
   state.fret = list[index].minFret;
-  try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {}
+  try { localStorage.setItem(STORE, JSON.stringify({ ...state, jam: undefined })); } catch {}
   try { history.replaceState(null, '', serializeHash(state, list[index])); } catch {}
 };
 
@@ -124,6 +128,85 @@ function renderModes() {
   document.getElementById('viewSwitch').appendChild(b);
 });
 
+// ---- play over chords (only when a progression arrives in the link) ---------
+// The Progression Builder opens this page with pk=, prog= and bpm= in the link.
+// The chords loop over a drum beat, and the notes of the chord being played are
+// ringed on the neck. The key and scale pickers are hidden here, so the scale
+// always fits the chords; the three scales offered all share the same notes.
+// Without a progression in the link none of this shows and nothing makes a sound.
+const $ = id => document.getElementById(id);
+let jamBar = 0, engine = null;
+const jamDeg = () => (state.jam ? state.jam.prog[jamBar] || 0 : 0);
+function jamTones() { return jamDeg() ? P.chordTones(state.jam.key, jamDeg()) : []; }
+function jamScales() {
+  const pc = P.keyPc(state.jam.key), rel = (pc + 9) % 12;
+  return [
+    ['majpent', pc, `${state.jam.key} major pentatonic`],
+    ['major', pc, `${state.jam.key} major`],
+    ['minpent', rel, `${T.tonicName(rel, 'minpent')} minor pentatonic`],
+  ];
+}
+function jamEngine() {
+  if (!engine) engine = createEngine(
+    () => ({ bpm: state.jam ? state.jam.bpm : 80, drums: true, chords: true,
+             bars: state.jam ? state.jam.prog.map(d => (d ? P.chordMidi(P.chordName(state.jam.key, d)) : null)) : [null] }),
+    (bar, beat) => {
+      $('jamCount').textContent = bar < 0 ? `Count in: ${beat + 1}` : '';
+      if (bar >= 0 && bar !== jamBar) { jamBar = bar; markJam(); paintDots(); }
+    });
+  return engine;
+}
+function jamStop() {
+  if (engine && engine.playing) engine.stop();
+  $('jamPlay').textContent = 'Play'; $('jamCount').textContent = '';
+}
+function markJam() {
+  document.querySelectorAll('#jamChords .jamchord').forEach((b, i) => b.classList.toggle('on', i === jamBar));
+}
+function renderJam() {
+  const on = !!state.jam;
+  $('jam').hidden = !on;
+  $('keys').hidden = on; scalesEl.hidden = on;
+  if (!on) { jamStop(); return; }
+  modesEl.hidden = true;
+  const j = state.jam;
+  if (jamBar >= j.prog.length) jamBar = 0;
+  const chords = $('jamChords');
+  chords.style.setProperty('--n', window.innerWidth < 700 ? Math.min(4, j.prog.length) : j.prog.length);
+  chords.innerHTML = '';
+  j.prog.forEach((d, i) => {
+    const b = document.createElement('button');
+    b.className = 'jamchord';
+    b.innerHTML = d ? `${P.chordName(j.key, d)}<small>${P.nashville(d)}</small>` : '–<small>&nbsp;</small>';
+    b.setAttribute('aria-label', `Bar ${i + 1}: ${d ? P.chordName(j.key, d) : 'empty'}. Show its notes.`);
+    b.addEventListener('click', () => {                 // look at one chord's notes while stopped
+      if (engine && engine.playing) return;
+      jamBar = i; markJam(); paintDots();
+      if (d) jamEngine().preview(P.chordMidi(P.chordName(j.key, d)));
+    });
+    chords.appendChild(b);
+  });
+  markJam();
+  const sc = $('jamScales');
+  sc.innerHTML = '';
+  for (const [scale, pc, label] of jamScales()) {
+    const b = document.createElement('button');
+    b.className = 'pill' + (state.scale === scale && state.tonicPc === pc ? ' on' : '');
+    b.textContent = label;
+    b.addEventListener('click', () => setScale(scale, pc, 'same'));
+    sc.appendChild(b);
+  }
+  $('jamBack').href = `https://matthewannable.github.io/progression-builder/?v=1` +
+    (j.level ? `&level=${j.level}` : '') + `&key=${j.key}&bars=${j.prog.length > 4 ? 8 : 4}&bpm=${j.bpm}&prog=${j.prog.join(',')}`;
+}
+$('jamPlay').addEventListener('click', () => {
+  const e = jamEngine();
+  if (e.playing) { jamStop(); return; }
+  jamBar = 0; markJam(); paintDots();
+  e.start(); $('jamPlay').textContent = 'Stop';
+});
+$('jamClose').addEventListener('click', () => { jamStop(); state.jam = null; render(true); });
+
 // ---- fretboard geometry ---------------------------------------------------
 const svg = document.getElementById('board');
 const NS = 'http://www.w3.org/2000/svg';
@@ -159,7 +242,7 @@ function buildDots() {
   const accentPcs = state.modeView === 'root' ? T.differingPcs(state.tonicPc, state.scale) : [];
   for (const n of T.neckNotes(state.tonicPc, state.scale)) {
     const g = el('g', { class: 'dot' }, svg);
-    g.dataset.s = n.string; g.dataset.f = n.fret;
+    g.dataset.s = n.string; g.dataset.f = n.fret; g.dataset.pc = n.pc;
     el('circle', { cx: xFret(n.fret), cy: yStr(n.string), r: 17 }, g);
     const t = el('text', { x: xFret(n.fret), y: yStr(n.string) + 1 }, g);
     t.textContent = state.labels === 'degrees' ? n.degree : state.labels === 'notes' ? n.name : '';
@@ -173,9 +256,11 @@ function buildDots() {
 function paintDots() {
   const cur = new Set(list[index].notes.map(n => n.string + ':' + n.fret));
   const rest = { only: 'hidden', faded: 'faded', whole: 'full' }[state.neck];
+  const tones = jamTones();
   for (const [k, g] of dotEls) {
     g.classList.remove('faded', 'full', 'hidden');
     if (!cur.has(k)) g.classList.add(rest);
+    g.classList.toggle('chord', tones.includes(+g.dataset.pc));
   }
   const inst = list[index];
   const x = X0 + (inst.minFret - 1) * W, w = (inst.maxFret - inst.minFret + 1) * W;
@@ -219,6 +304,7 @@ function renderChrome() {
   const line = state.modeView === 'root' && T.MODE_LINES[state.scale] ? T.MODE_LINES[state.scale] : '';
   const ml = document.getElementById('modeline'); ml.textContent = line; ml.hidden = !line;
   renderModes();
+  renderJam();
   document.title = document.getElementById('title').textContent + ' – Fretboard Visualiser';
   document.querySelectorAll('#scales .pill').forEach(b => b.classList.toggle('on',
     b.dataset.v === 'modes' ? (T.isDiatonic(state.scale) && !['major', 'minor'].includes(state.scale)) : b.dataset.v === state.scale));
@@ -300,6 +386,7 @@ window.addEventListener('resize', () => setView(false));
 window.addEventListener('hashchange', () => {
   const h = parseHash(location.hash);
   if (!Object.keys(h).length) return;
+  if (h.jam) jamStop();
   Object.assign(state, h); rebuildList(true); render(true);
 });
 

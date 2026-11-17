@@ -154,4 +154,38 @@ test('15. bad hash input is ignored field by field and never throws', () => {
   assert.deepEqual(parseHash('#key=D&scale=lol&neck=faded'), { tonicPc: 2, neck: 'faded' });
 });
 
+import * as P from './progression.js';
+test('play over chords: a link from the Progression Builder is read', () => {
+  const h = parseHash('#key=G&scale=majpent&pk=G&prog=1,5,6,4&bpm=90&lv=2');
+  assert.deepEqual(h.jam, { key: 'G', prog: [1, 5, 6, 4], bpm: 90, level: 2 });
+  assert.equal(h.scale, 'majpent');
+});
+test('play over chords: the builder\'s own link is understood here', () => {
+  const url = P.visualiserLink('D', 'major', { prog: [1, 0, 4, 5], bpm: 100, level: 1 });
+  assert.deepEqual(parseHash(url.slice(url.indexOf('#'))).jam, { key: 'D', prog: [1, 0, 4, 5], bpm: 100, level: 1 });
+});
+test('play over chords: no progression, a bad key or only empty bars means the plain visualiser', () => {
+  assert.equal(parseHash('#key=G&scale=major').jam, undefined);
+  assert.equal(parseHash('#key=G&pk=H&prog=1,4').jam, undefined);
+  assert.equal(parseHash('#key=G&pk=G&prog=0,0').jam, undefined);
+  assert.equal(parseHash('#key=G&pk=G&prog=1,9').jam, undefined);
+});
+test('play over chords: the link survives being written back out', () => {
+  const jam = { key: 'A', prog: [1, 5, 6, 4, 1, 3, 2, 5], bpm: 80, level: 3 };
+  const hash = serializeHash({ tonicPc: 9, scale: 'major', modeView: 'notes', labels: 'degrees', neck: 'faded', jam }, { shape: 'E', minFret: 4 });
+  assert.deepEqual(parseHash(hash).jam, jam);
+  assert.ok(!hash.includes('%2C'));
+});
+test('play over chords: the three scales offered share one set of notes', () => {
+  for (const key of P.KEYS) {
+    const pc = P.keyPc(key);
+    const major = T.scalePcs(pc, 'major'), pent = T.scalePcs(pc, 'majpent'), rel = T.scalePcs(mod12(pc + 9), 'minpent');
+    assert.deepEqual([...pent].sort(), [...rel].sort(), key);
+    assert.ok(pent.every(x => major.includes(x)), key);
+  }
+});
+test('play over chords: every chord note is in the key\'s major scale', () => {
+  for (const key of P.KEYS) for (let d = 1; d <= 6; d++)
+    assert.ok(P.chordTones(key, d).every(x => T.scalePcs(P.keyPc(key), 'major').includes(x)), key + d);
+});
 console.log(`\nAll ${n} tests passed`);

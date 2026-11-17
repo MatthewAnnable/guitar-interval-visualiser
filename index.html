@@ -61,6 +61,20 @@
   .strip .arrow { border:1.5px solid var(--line); background:var(--card); border-radius:20px; padding:5px 14px; font-weight:700; }
   .opts { display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:center; }
   @media (max-width:600px) { .pill { padding:5px 10px; font-size:14px; } #modes .chip { padding:3px 7px; font-size:13px; } h1 { font-size:18px; } .strip { gap:4px; } .strip .chip { min-width:34px; padding:5px 6px; } .strip .arrow { padding:5px 10px; } }
+  /* Play over chords: only shown when a progression arrives from the Progression Builder */
+  .jam { margin:0 0 10px; }
+  .jamhead { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; font-size:14px; font-weight:600; color:var(--mute); }
+  .jamhead a { color:var(--accent); }
+  .jamhead button { border:1.5px solid var(--line); background:none; border-radius:999px; padding:6px 14px; font-weight:600; font-size:14px; min-height:36px; }
+  .jamchords { display:grid; grid-template-columns:repeat(var(--n, 4), minmax(0, 1fr)); gap:6px; margin-bottom:10px; }
+  .jamchord { border:1.5px solid var(--line); background:var(--card); border-radius:12px; padding:6px 2px; min-height:48px; font-weight:800; font-size:18px; line-height:1.15; }
+  .jamchord small { display:block; font-size:11px; font-weight:600; color:var(--mute); }
+  .jamchord.on { border-color:var(--acc); box-shadow:inset 0 0 0 1.5px var(--acc); }
+  .jamrow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+  .jamrow .big { border:0; padding:10px 26px; font-size:17px; min-height:48px; min-width:104px; }
+  .jamrow .count { color:var(--acc); font-weight:700; }
+  .jamnote { color:var(--mute); font-size:14px; margin:0 0 4px; }
+  .fb .dot.chord circle, .fb .dot.faded.chord circle, .fb .dot.faded.root.chord circle { stroke:var(--acc); stroke-width:5; }
   .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 </style>
 <meta name="theme-color" content="#141A17" media="(prefers-color-scheme: dark)">
@@ -71,6 +85,13 @@
 <div class="wrap">
   <p class="ma-brand"><svg viewBox="-12 -12 779 339" aria-hidden="true"><polyline points="0,158 85,158 159,315 159,0 292,315 425,0 425,315 559,0 693,315 533,158 755,158" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/></svg>Matthew Annable</p>
   <h1 id="title"></h1>
+  <div class="jam" id="jam" hidden>
+    <div class="jamhead"><span>Playing over your chords · <a id="jamBack">change the chords</a></span><button id="jamClose">Close</button></div>
+    <div class="jamchords" id="jamChords"></div>
+    <div class="jamrow"><button class="big" id="jamPlay">Play</button><span class="count" id="jamCount" aria-live="polite"></span></div>
+    <div class="jamrow" id="jamScales" role="group" aria-label="Scale to try"></div>
+    <p class="jamnote">Ringed notes belong to the chord being played. Aim to land on them.</p>
+  </div>
   <div class="row" id="keys" role="group" aria-label="Key"></div>
   <div class="row" id="scales" role="group" aria-label="Scale"></div>
   <div id="modes" hidden>

@@ -1,5 +1,6 @@
 // URL-hash links (PLAN 5.5). Pure functions, no DOM.
 import { SCALES, tonicName } from './theory.js';
+import { KEYS as PROG_KEYS } from './progression.js';
 
 const LETTER_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 export const LABEL_VALUES = ['degrees', 'notes', 'none'];
@@ -31,7 +32,13 @@ export function serializeHash(state, inst) {
     ['dots', state.labels],
     ['neck', state.neck],
   ];
-  return '#' + parts.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  // "Play over chords": the progression made in the Progression Builder.
+  // pk = its key, prog = the chord numbers bar by bar (0 = empty), lv = the builder's level.
+  if (state.jam) {
+    parts.push(['pk', state.jam.key], ['prog', state.jam.prog.join(',')], ['bpm', state.jam.bpm]);
+    if (state.jam.level) parts.push(['lv', state.jam.level]);
+  }
+  return '#' + parts.map(([k, v]) => `${k}=${String(v).split(',').map(encodeURIComponent).join(',')}`).join('&');
 }
 
 // Returns only the fields that were present AND valid. Never throws.
@@ -56,6 +63,12 @@ export function parseHash(hash) {
     if (/^\d{1,2}$/.test(get.fret || '')) { const f = +get.fret; if (f >= 0 && f <= 15) out.fret = f; }
     if (LABEL_VALUES.includes(get.dots)) out.labels = get.dots;
     if (NECK_VALUES.includes(get.neck)) out.neck = get.neck;
+    const pk = String(get.pk || '').toUpperCase(), prog = String(get.prog || '');
+    if (PROG_KEYS.includes(pk) && /^[0-6](,[0-6]){0,7}$/.test(prog) && /[1-6]/.test(prog)) {
+      const bpm = /^\d{2,3}$/.test(get.bpm || '') && +get.bpm >= 50 && +get.bpm <= 160 ? +get.bpm : 80;
+      out.jam = { key: pk, prog: prog.split(',').map(Number), bpm };
+      if (/^[1-3]$/.test(get.lv || '')) out.jam.level = +get.lv;
+    }
   } catch { return {}; }
   return out;
 }

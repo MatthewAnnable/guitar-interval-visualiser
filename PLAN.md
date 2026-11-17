@@ -229,3 +229,24 @@ Do not build these, but do not block them either.
 ## 9. Settled naming
 
 Matthew confirmed on 16/11/2026 that major pentatonic shapes are named by CAGED letter, not numbered. Only the minor pentatonic uses Shape 1 to 5. The table in 3.5 is final.
+
+## "Play over chords" mode (built 17/11/2026)
+
+A link from the Progression Builder (`../progression-builder/`) can carry a
+chord progression: `pk=` (its key), `prog=` (chord numbers bar by bar), `bpm=`
+and `lv=`. Only then does this page show a chord strip and a Play button above
+the neck, loop the chords over a drum beat, and ring the notes of the chord
+being played. The key and scale pickers are hidden in this mode and replaced by
+three scales that share one set of notes. Close returns to the plain view.
+
+How it keeps to the rules in section 1:
+
+- **No sound in the plain view.** Sound exists only in this mode.
+- **Tapping or dragging the neck never changes the key or scale.** Unchanged.
+- **One idea on screen.** The pickers are hidden while the chords are shown,
+  and the mode has a single one-line note.
+- The progression is never saved on the device, so the next visit is plain.
+
+`progression.js` and `audio.js` are copies of the builder's `theory.js` and
+`audio.js`. The builder is the master: never edit them here. The full write-up
+is in `../progression-builder/PLAN.md`.
