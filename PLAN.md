@@ -250,3 +250,7 @@ How it keeps to the rules in section 1:
 `progression.js` and `audio.js` are copies of the builder's `theory.js` and
 `audio.js`. The builder is the master: never edit them here. The full write-up
 is in `../progression-builder/PLAN.md`.
+
+## Strip view (24/11/2026)
+
+For lessons. OBS's "1-Phone Strip" scene shows only rows 124–524 of the 1600x1200 iPad capture (the "iPad Band" crop) above the camera. Strip view pins the whole neck into exactly that band and lets everything else scroll underneath. The button (bottom left) appears only on a device that has opened the page once with `?lesson`, so students never see it. If the OBS crop changes, change `SV_TOP`/`SV_BOT` in app.js to match.

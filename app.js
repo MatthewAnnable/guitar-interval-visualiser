@@ -269,7 +269,7 @@ function paintDots() {
 
 // ---- view window (narrow screens show 9 frets) ---------------------------
 function targetView() {
-  narrow = window.innerWidth < 700;
+  narrow = window.innerWidth < 700 && !stripOn;
   if (!narrow) return { x: 0, w: FULL_W };
   const inst = list[index];
   const c = X0 + ((inst.minFret + inst.maxFret) / 2 - 0.5) * W, w = 9 * W + 20;
@@ -389,6 +389,57 @@ window.addEventListener('hashchange', () => {
   if (h.jam) jamStop();
   Object.assign(state, h); rebuildList(true); render(true);
 });
+
+
+// ---- strip view (24/11/2026) ------------------------------------------------
+// In lessons OBS's "1-Phone Strip" scene shows a band of the iPad screen above
+// the camera: rows 124-524 of the 1600x1200 iPad capture (the "iPad Band"
+// crop). Strip view pins the whole neck into exactly that band; everything
+// else scrolls underneath it. Works with Safari's bar showing, in full screen
+// and with Safari's page zoom (aA), because it measures the screen in points.
+const SV_TOP = 124 / 1200, SV_BOT = 524 / 1200, SV_KEY = 'neck-stripview';
+let stripOn = false;
+const svBtn = document.createElement('button');
+svBtn.type = 'button'; svBtn.className = 'sv-btn';
+function stripLayout() {
+  const r = document.documentElement;
+  r.classList.toggle('sv', stripOn);
+  svBtn.classList.toggle('on', stripOn);
+  svBtn.textContent = stripOn ? 'Strip view: on' : 'Strip view';
+  if (!stripOn) return;
+  const land = window.innerWidth > window.innerHeight;
+  const sw = land ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const sh = land ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+  const scrH = sh * window.innerWidth / sw;               // whole screen, in page pixels
+  const above = Math.max(0, scrH - window.innerHeight);   // Safari's bar (0 in full screen)
+  const top = SV_TOP * scrH - above, h = (SV_BOT - SV_TOP) * scrH;
+  const band = parseFloat(getComputedStyle(r).getPropertyValue('--tt-band')) || 0;
+  r.style.setProperty('--sv-top', top.toFixed(1) + 'px');
+  r.style.setProperty('--sv-h', h.toFixed(1) + 'px');
+  r.style.setProperty('--sv-pad', Math.max(14, top + h + 10 - band).toFixed(0) + 'px');
+}
+function setStrip(on) {
+  stripOn = on;
+  try { localStorage.setItem(SV_KEY, on ? '1' : ''); } catch {}
+  stripLayout(); setView(false);
+}
+svBtn.addEventListener('click', () => setStrip(!stripOn));
+// Only Matthew's lesson iPad gets the button: open the page once with ?lesson
+// and it stays (students never see it).
+let teacher = false;
+try {
+  if (/[?&]lesson\b/.test(location.search)) localStorage.setItem('neck-teacher', '1');
+  teacher = localStorage.getItem('neck-teacher') === '1';
+} catch {}
+if (teacher) {
+  document.body.appendChild(svBtn);
+  try { stripOn = localStorage.getItem(SV_KEY) === '1'; } catch {}
+  stripLayout();
+  const relayout = () => requestAnimationFrame(() => { stripLayout(); setView(false); });
+  window.addEventListener('resize', relayout);
+  document.addEventListener('fullscreenchange', relayout);
+  document.addEventListener('webkitfullscreenchange', relayout);
+}
 
 // ---- go -------------------------------------------------------------------
 applyHash();

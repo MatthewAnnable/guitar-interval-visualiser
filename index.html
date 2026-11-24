@@ -75,6 +75,15 @@
   .jamrow .count { color:var(--acc); font-weight:700; }
   .jamnote { color:var(--mute); font-size:14px; margin:0 0 4px; }
   .fb .dot.chord circle, .fb .dot.faded.chord circle, .fb .dot.faded.root.chord circle { stroke:var(--acc); stroke-width:5; }
+  /* Strip view (24/11/2026): the neck pinned to the part of the iPad screen
+     that OBS's 1-Phone Strip shows (see strip view in app.js). */
+  .sv-btn { position:fixed; left:12px; bottom:12px; z-index:2147483000; display:inline-flex; align-items:center;
+    height:34px; padding:0 12px; border-radius:17px; border:1px solid var(--line); background:var(--card); color:var(--mute);
+    font:600 13px/1 Manrope, system-ui, -apple-system, sans-serif; opacity:.75; cursor:pointer; }
+  .sv-btn.on { color:var(--ink); opacity:1; border-color:var(--accent); }
+  html.sv .fb { position:fixed; left:0; right:0; top:var(--sv-top); height:var(--sv-h); width:100%; margin:0; z-index:6; }
+  html.sv body::before { content:""; position:fixed; left:0; right:0; top:0; height:calc(var(--sv-top) + var(--sv-h)); background:var(--bg); z-index:5; }
+  html.sv .wrap { padding-top:var(--sv-pad); }
   .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 </style>
 <meta name="theme-color" content="#141A17" media="(prefers-color-scheme: dark)">
